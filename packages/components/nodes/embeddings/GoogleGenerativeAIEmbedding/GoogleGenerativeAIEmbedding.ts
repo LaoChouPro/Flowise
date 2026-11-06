@@ -3,6 +3,7 @@ import { getBaseClasses, getCredentialData, getCredentialParam } from '../../../
 import { GoogleGenerativeAIEmbeddings, GoogleGenerativeAIEmbeddingsParams } from '@langchain/google-genai'
 import { TaskType } from '@google/generative-ai'
 import { MODEL_TYPE, getModels } from '../../../src/modelLoader'
+import { checkDenyList } from '../../../src/httpSecurity'
 
 class GoogleGenerativeAIEmbeddingsWithStripNewLines extends GoogleGenerativeAIEmbeddings {
     stripNewLines: boolean
@@ -82,6 +83,14 @@ class GoogleGenerativeAIEmbedding_Embeddings implements INode {
                 optional: true,
                 additionalParams: true,
                 description: 'Remove new lines from input text before embedding to reduce token count'
+            },
+            {
+                label: 'Base URL',
+                name: 'baseUrl',
+                type: 'string',
+                description: 'Base URL for the API. Leave empty to use the default.',
+                optional: true,
+                additionalParams: true
             }
         ]
     }
@@ -93,12 +102,12 @@ class GoogleGenerativeAIEmbedding_Embeddings implements INode {
         }
     }
 
-    // eslint-disable-next-line unused-imports/no-unused-vars
     async init(nodeData: INodeData, _: string, options: ICommonObject): Promise<any> {
         const modelName = nodeData.inputs?.modelName as string
         const credentialData = await getCredentialData(nodeData.credential ?? '', options)
         const apiKey = getCredentialParam('googleGenerativeAPIKey', credentialData, nodeData)
         const stripNewLines = nodeData.inputs?.stripNewLines as boolean
+        const baseUrl = nodeData.inputs?.baseUrl as string | undefined
 
         let taskType: TaskType
         switch (nodeData.inputs?.tasktype as string) {
@@ -126,6 +135,10 @@ class GoogleGenerativeAIEmbedding_Embeddings implements INode {
             modelName: modelName,
             taskType: taskType,
             stripNewLines
+        }
+        if (baseUrl) {
+            await checkDenyList(baseUrl)
+            obj.baseUrl = baseUrl
         }
 
         const model = new GoogleGenerativeAIEmbeddingsWithStripNewLines(obj)
